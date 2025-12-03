@@ -1,0 +1,58 @@
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+nbavenv/
+.venv/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# === Environment Files ===
+.env
+.env.*
+*.env
+
+# === OS / Editor Files ===
+.DS_Store
+Thumbs.db
+
+# === Cache / Logs ===
+*.log
+npm-debug.log*
+pip-log.txt
+pip-delete-this-directory.txt
+
+# === Project-specific ===
+nba_cache.db
+#cache/
+*.sqlite
+*.db
+*.pkl
+
+# Ignore downloaded data unless you intentionally want it versioned
+#data/
+*.csv
+*.json
+
+# Allow an empty data/ folder
+!data/.gitkeep
+
+# === Temporary files ===
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# === Build / Distribution ===
+dist/
+build/
+
