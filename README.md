@@ -11,3 +11,4 @@ Historical Vegas data is used in the model, and you will need to download the cs
 
 Current code / models' metrics won't knock socks off but are not bad, either.
 
+NEXT STEPS for better model: injury data source and usage, lineup data source and usage, better minutes prediction, better usage rate prediction .....
