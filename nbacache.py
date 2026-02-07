@@ -80,6 +80,18 @@ class CacheManager:
             key TEXT PRIMARY KEY,
             model_blob BLOB
         );
+
+        CREATE TABLE IF NOT EXISTS processed_player_season (
+            player_id INTEGER,
+            season TEXT,
+            feature_version TEXT,
+            team_stats_updated INTEGER,
+            last_game_date TEXT,
+            row_count INTEGER,
+            data BLOB,
+            last_updated TIMESTAMP,
+            PRIMARY KEY (player_id, season, feature_version)
+        );
         """)
         self.conn.commit()
 
@@ -115,7 +127,7 @@ class CacheManager:
             for _, row in df.iterrows():
                 cur.execute(
                     "INSERT OR REPLACE INTO top_scorers (season, player_id, rank, pts, last_updated) VALUES (?,?,?,?,?)",
-                    (season, int(row["PLAYER_ID"]), int(row["RANK"]), float(row["PTS"]), ts)
+                    (season, int(row["player_id"]), int(row["rank"]), float(row["pts"]), ts)
                 )
             self.conn.commit()
 
@@ -168,6 +180,54 @@ class CacheManager:
                 last_updated = row[1]
                 return df, last_updated
             return None, None
+
+    # ---------- PROCESSED PLAYER SEASON ----------
+    def save_processed_player_season(self, player_id, season, feature_version, team_stats_updated, last_game_date, row_count, df):
+        with self.lock:
+            blob = pickle.dumps(df)
+            ts = int(time.time())
+            cur = self.conn.cursor()
+            cur.execute("""
+                INSERT OR REPLACE INTO processed_player_season
+                (player_id, season, feature_version, team_stats_updated, last_game_date, row_count, data, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (player_id, season, feature_version, team_stats_updated, last_game_date, row_count, blob, ts))
+            self.conn.commit()
+
+    def load_processed_player_season(self, player_id, season, feature_version):
+        with self.lock:
+            cur = self.conn.cursor()
+            cur.execute("""
+                SELECT data, team_stats_updated, last_game_date, row_count
+                FROM processed_player_season
+                WHERE player_id=? AND season=? AND feature_version=?
+            """, (player_id, season, feature_version))
+            row = cur.fetchone()
+            if not row:
+                return None, None, None, None
+            df = pickle.loads(row[0])
+            team_stats_updated = row[1]
+            last_game_date = row[2]
+            row_count = row[3]
+            return df, team_stats_updated, last_game_date, row_count
+
+    def clear_processed_player_season(self, feature_version=None, season=None, player_id=None):
+        with self.lock:
+            clauses = []
+            params = []
+            if feature_version is not None:
+                clauses.append("feature_version=?")
+                params.append(feature_version)
+            if season is not None:
+                clauses.append("season=?")
+                params.append(season)
+            if player_id is not None:
+                clauses.append("player_id=?")
+                params.append(player_id)
+            where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+            cur = self.conn.cursor()
+            cur.execute(f"DELETE FROM processed_player_season {where}", params)
+            self.conn.commit()
 
     # ---------- TEAMS ----------
     def save_teams(self, teams_list):
