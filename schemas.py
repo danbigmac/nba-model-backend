@@ -43,9 +43,10 @@ class NextGamePrediction(BaseModel):
     player: str
     opponent: str
     game_date: str
-    home_away: str
+    home_away: Optional[str] = None
     model: str
     predicted_pts: Optional[float] = None
+    model_predicted_pts: Optional[float] = None
     vegas_total: Optional[float] = None
     vegas_spread: Optional[float] = None
     used_baseline: Optional[bool] = None

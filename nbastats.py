@@ -1635,8 +1635,6 @@ def predict_next_games(games, train_seasons, season, models, cache) -> List[Dict
             if model_name not in models_to_train:
                 continue
             tune_info = tuned_params.get(model_name)
-            if tune_info and tune_info.get("use_baseline"):
-                continue
             trained[model_name] = train_func(
                 X_train_player,
                 y_train_player,
@@ -1967,57 +1965,6 @@ def predict_next_games(games, train_seasons, season, models, cache) -> List[Dict
         trained_models = player_models.get(player) or {}
         fallback_flags = player_model_fallbacks.get(player, {})
         for model_name in models_to_train:
-            if fallback_flags.get(model_name):
-                if vegas_missing:
-                    print(f"[predict_next] Vegas missing for {player} ({model_name})")
-                    results.append({
-                        "player": player,
-                        "opponent": opponent,
-                        "game_date": game_value(game, "game_date"),
-                        "home_away": "home" if home_away == 1 else "away",
-                        "model": model_name,
-                        "predicted_pts": None,
-                        "vegas_total": vegas_total,
-                        "vegas_spread": vegas_spread,
-                        "error": "Vegas lines not found for this matchup/date",
-                    })
-                    continue
-                if vegas_pts_prop is None or (isinstance(vegas_pts_prop, float) and np.isnan(vegas_pts_prop)):
-                    results.append({
-                        "player": player,
-                        "opponent": opponent,
-                        "game_date": game_value(game, "game_date"),
-                        "home_away": "home" if home_away == 1 else "away",
-                        "model": model_name,
-                        "predicted_pts": None,
-                        "vegas_total": vegas_total,
-                        "vegas_spread": vegas_spread,
-                        "error": "VegasPTSProp is missing for prediction row",
-                    })
-                    continue
-                pred_resid = 0.0
-                pred_pts = vegas_pts_prop
-                print(
-                    f"[predict_next] {player} {model_name}: "
-                    f"train_rows={player_train_counts.get(player, 0)}, "
-                    f"VegasPTSProp={vegas_pts_prop:.2f}, "
-                    f"pred_resid={pred_resid:.2f} (baseline), "
-                    f"pred_pts={pred_pts:.2f}"
-                )
-                results.append({
-                    "player": player,
-                    "opponent": opponent,
-                    "game_date": game_value(game, "game_date"),
-                    "home_away": "home" if home_away == 1 else "away",
-                    "model": model_name,
-                    "predicted_pts": float(pred_pts),
-                    "vegas_total": vegas_total,
-                    "vegas_spread": vegas_spread,
-                    "used_baseline": True,
-                    "validated": False,
-                })
-                continue
-
             model = trained_models.get(model_name)
             if model is None:
                 results.append({
@@ -2072,13 +2019,41 @@ def predict_next_games(games, train_seasons, season, models, cache) -> List[Dict
                     "error": "VegasPTSProp is missing for prediction row",
                 })
                 continue
-            pred_pts = vegas_pts_prop + pred_resid
+
+            model_pred_pts = vegas_pts_prop + pred_resid
+
+            if fallback_flags.get(model_name):
+                final_pred_pts = vegas_pts_prop
+                print(
+                    f"[predict_next] {player} {model_name}: "
+                    f"train_rows={player_train_counts.get(player, 0)}, "
+                    f"VegasPTSProp={vegas_pts_prop:.2f}, "
+                    f"model_pred_resid={pred_resid:.2f}, "
+                    f"model_pred_pts={model_pred_pts:.2f}, "
+                    f"final_pred_pts={final_pred_pts:.2f} (baseline)"
+                )
+                results.append({
+                    "player": player,
+                    "opponent": opponent,
+                    "game_date": game_value(game, "game_date"),
+                    "home_away": "home" if home_away == 1 else "away",
+                    "model": model_name,
+                    "predicted_pts": float(final_pred_pts),
+                    "model_predicted_pts": float(model_pred_pts),
+                    "vegas_total": vegas_total,
+                    "vegas_spread": vegas_spread,
+                    "used_baseline": True,
+                    "validated": False,
+                })
+                continue
+
+            final_pred_pts = model_pred_pts
             print(
                 f"[predict_next] {player} {model_name}: "
                 f"train_rows={player_train_counts.get(player, 0)}, "
                 f"VegasPTSProp={vegas_pts_prop:.2f}, "
                 f"pred_resid={pred_resid:.2f}, "
-                f"pred_pts={pred_pts:.2f}"
+                f"pred_pts={final_pred_pts:.2f}"
             )
             results.append({
                 "player": player,
@@ -2086,7 +2061,8 @@ def predict_next_games(games, train_seasons, season, models, cache) -> List[Dict
                 "game_date": game_value(game, "game_date"),
                 "home_away": "home" if home_away == 1 else "away",
                 "model": model_name,
-                "predicted_pts": float(pred_pts),
+                "predicted_pts": float(final_pred_pts),
+                "model_predicted_pts": float(model_pred_pts),
                 "vegas_total": vegas_total,
                 "vegas_spread": vegas_spread,
                 "validated": True,
